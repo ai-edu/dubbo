@@ -708,6 +708,9 @@ public class DubboBootstrap {
         return configManager.getDefaultConfigs(clazz).isEmpty();
     }
 
+    /**
+     * 开始设置配置中心
+     */
     private void startConfigCenter() {
 
         // load application config
@@ -1096,6 +1099,7 @@ public class DubboBootstrap {
 
     /**
      * Start the bootstrap
+     * {@link org.apache.dubbo.config.spring.context.DubboBootstrapApplicationListener#onContextRefreshedEvent}
      */
     public synchronized DubboBootstrap start() {
         // avoid re-entry start method multiple times in same thread
@@ -1115,7 +1119,7 @@ public class DubboBootstrap {
                 if (logger.isInfoEnabled()) {
                     logger.info(NAME + " is starting...");
                 }
-
+                // 核心任务
                 doStart();
 
                 if (logger.isInfoEnabled()) {
@@ -1125,7 +1129,7 @@ public class DubboBootstrap {
                 if (logger.isInfoEnabled()) {
                     logger.info(NAME + " is started, export/refer new services.");
                 }
-
+                // 核心任务
                 doStart();
 
                 if (logger.isInfoEnabled()) {
@@ -1385,10 +1389,14 @@ public class DubboBootstrap {
         }
     }
 
+    /**
+     * 暴露 Dubbo 服务
+     */
     private void exportServices() {
         for (ServiceConfigBase sc : configManager.getServices()) {
             // TODO, compatible with ServiceConfig.export()
             ServiceConfig<?> serviceConfig = (ServiceConfig<?>) sc;
+            // 给 ServiceConfig 添加 DubboBootstrap 对象
             serviceConfig.setBootstrap(this);
             if (!serviceConfig.isRefreshed()) {
                 serviceConfig.refresh();
@@ -1401,6 +1409,7 @@ public class DubboBootstrap {
                 CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                     try {
                         if (!sc.isExported()) {
+                            // 调用 ServiceConfig 的 export 方法，进行服务暴露
                             sc.export();
                             exportedServices.add(sc);
                         }
@@ -1487,6 +1496,9 @@ public class DubboBootstrap {
         }
     }
 
+    /**
+     * 注册服务
+     */
     private void registerServiceInstance() {
         if (this.serviceInstance != null) {
             return;
@@ -1518,11 +1530,16 @@ public class DubboBootstrap {
         }
     }
 
+    /**
+     * 服务注册
+     * @param serviceInstance
+     */
     private void doRegisterServiceInstance(ServiceInstance serviceInstance) {
         // register instance only when at least one service is exported.
         if (serviceInstance.getPort() > 0) {
             publishMetadataToRemote(serviceInstance);
             logger.info("Start registering instance address to registry.");
+            // 遍历当前全部的注册中心
             getServiceDiscoveries().forEach(serviceDiscovery ->
             {
                 ServiceInstance serviceInstanceForRegistry = new DefaultServiceInstance((DefaultServiceInstance) serviceInstance);

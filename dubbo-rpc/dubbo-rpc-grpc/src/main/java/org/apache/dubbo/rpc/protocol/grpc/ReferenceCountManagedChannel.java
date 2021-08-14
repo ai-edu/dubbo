@@ -29,10 +29,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class ReferenceCountManagedChannel extends ManagedChannel {
 
+    // channel 的引用计数
     private final AtomicInteger referenceCount = new AtomicInteger(0);
 
     private ManagedChannel grpcChannel;
 
+    /**
+     *
+     * @param delegated grpcChannel的管理对象
+     */
     public ReferenceCountManagedChannel(ManagedChannel delegated) {
         this.grpcChannel = delegated;
     }
@@ -44,6 +49,10 @@ public class ReferenceCountManagedChannel extends ManagedChannel {
         return referenceCount.incrementAndGet();
     }
 
+    /**
+     * 关闭该 grpcChannel; 仅当该 grpcChannel 的客户端引用计数<=0时，才真正关闭
+     * @return
+     */
     @Override
     public ManagedChannel shutdown() {
         if (referenceCount.decrementAndGet() <= 0) {
@@ -52,6 +61,10 @@ public class ReferenceCountManagedChannel extends ManagedChannel {
         return grpcChannel;
     }
 
+    /**
+     * 判断 grpcChannel 是关闭
+     * @return
+     */
     @Override
     public boolean isShutdown() {
         return grpcChannel.isShutdown();
@@ -73,11 +86,23 @@ public class ReferenceCountManagedChannel extends ManagedChannel {
         return grpcChannel.awaitTermination(timeout, unit);
     }
 
+    /**
+     * 构建一个 ClientCall 对象，此时并未触发远程调用行为
+     * @param methodDescriptor
+     * @param callOptions
+     * @param <RequestT>
+     * @param <ResponseT>
+     * @return
+     */
     @Override
     public <RequestT, ResponseT> ClientCall<RequestT, ResponseT> newCall(MethodDescriptor<RequestT, ResponseT> methodDescriptor, CallOptions callOptions) {
         return grpcChannel.newCall(methodDescriptor, callOptions);
     }
 
+    /**
+     * 当前的 grpcChannel 连接到的目的地，通常为 "host:port"
+     * @return
+     */
     @Override
     public String authority() {
         return grpcChannel.authority();

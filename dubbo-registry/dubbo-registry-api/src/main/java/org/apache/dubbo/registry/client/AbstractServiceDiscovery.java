@@ -40,6 +40,11 @@ public abstract class AbstractServiceDiscovery implements ServiceDiscovery {
 
     public abstract void doInitialize(URL registryURL) throws Exception;
 
+    /**
+     * 服务注册
+     * @param serviceInstance an instance of {@link ServiceInstance} to be registered
+     * @throws RuntimeException
+     */
     @Override
     public final void register(ServiceInstance serviceInstance) throws RuntimeException {
         if (ServiceInstanceMetadataUtils.getExportedServicesRevision(serviceInstance) == null) {

@@ -73,12 +73,17 @@ public class DubboBootstrapApplicationListener implements ApplicationListener, A
         return dubboBootstrap;
     }
 
+    /**
+     * 监听 Spring 事件
+     * @param event
+     */
     @Override
     public void onApplicationEvent(ApplicationEvent event) {
         if (isOriginalEventSource(event)) {
             if (event instanceof DubboAnnotationInitedEvent) {
                 // This event will be notified at AbstractApplicationContext.registerListeners(),
                 // init dubbo config beans before spring singleton beans
+                // 初始化dubbo配置Bean
                 initDubboConfigBeans();
             } else if (event instanceof ApplicationContextEvent) {
                 this.onApplicationContextEvent((ApplicationContextEvent) event);
@@ -110,6 +115,10 @@ public class DubboBootstrapApplicationListener implements ApplicationListener, A
         }
     }
 
+    /**
+     * 监听 ContextRefreshedEvent 时间
+     * @param event
+     */
     private void onContextRefreshedEvent(ContextRefreshedEvent event) {
         if (dubboBootstrap.getTakeoverMode() == BootstrapTakeoverMode.SPRING) {
             dubboBootstrap.start();

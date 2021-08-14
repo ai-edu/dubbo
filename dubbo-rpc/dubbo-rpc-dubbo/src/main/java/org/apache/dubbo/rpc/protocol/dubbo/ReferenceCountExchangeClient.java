@@ -156,6 +156,10 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
         close(0);
     }
 
+    /**
+     * 关闭当前 Client
+     * @param timeout
+     */
     @Override
     public void close(int timeout) {
         if (referenceCount.decrementAndGet() <= 0) {

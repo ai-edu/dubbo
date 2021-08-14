@@ -89,6 +89,10 @@ public class ZookeeperServiceDiscovery extends AbstractServiceDiscovery {
         serviceDiscovery.close();
     }
 
+    /**
+     * 服务注册，调用 Curator 的 registerService
+     * @param serviceInstance
+     */
     @Override
     public void doRegister(ServiceInstance serviceInstance) {
         try {

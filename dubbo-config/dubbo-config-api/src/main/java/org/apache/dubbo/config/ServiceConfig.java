@@ -115,7 +115,9 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
      * A delayed exposure service timer
      */
     private static final ScheduledExecutorService DELAY_EXPORT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(new NamedThreadFactory("DubboServiceDelayExporter", true));
-
+    /**
+     * 使用 SPI 方式 加载 Protocol
+     */
     private static final Protocol PROTOCOL = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
 
     /**
@@ -226,13 +228,13 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             if (!shouldExport()) {
                 return;
             }
-
+            // 服务暴露
             if (shouldDelay()) {
                 DELAY_EXPORT_EXECUTOR.schedule(this::doExport, getDelay(), TimeUnit.MILLISECONDS);
             } else {
                 doExport();
             }
-
+            // 什么意思？有必要吗？
             if (this.bootstrap.getTakeoverMode() == BootstrapTakeoverMode.AUTO) {
                 this.bootstrap.start();
             }
@@ -241,13 +243,16 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
     protected void exported() {
         exported = true;
+        // 获取全部导出的 URL
         List<URL> exportedURLs = this.getExportedUrls();
         exportedURLs.forEach(url -> {
             if (url.getParameters().containsKey(SERVICE_NAME_MAPPING_KEY)) {
+                // 如果需要服务名映射
                 ServiceNameMapping serviceNameMapping = ServiceNameMapping.getDefaultExtension();
                 serviceNameMapping.map(url);
             }
         });
+        // 导出成功，发送事件
         onExported();
     }
 
@@ -328,6 +333,9 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         checkAndUpdateSubConfigs();
     }
 
+    /**
+     * 服务暴露；同步方法
+     */
     protected synchronized void doExport() {
         if (unexported) {
             throw new IllegalStateException("The service " + interfaceClass.getName() + " has already unexported!");
@@ -340,13 +348,20 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
             path = interfaceName;
         }
         doExportUrls();
+        // 导出完之后调用的方法
         exported();
     }
 
+    /**
+     * 暴露服务
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
+        // 获取服务池
         ServiceRepository repository = ApplicationModel.getServiceRepository();
+        // 解析并创建 ServiceDescriptor 保存在 services Map 中
         ServiceDescriptor serviceDescriptor = repository.registerService(getInterfaceClass());
+        // 创建 providerModel 保存在 providers Map 和 providersWithoutGroup Map中
         repository.registerProvider(
                 getUniqueServiceName(),
                 ref,
@@ -354,15 +369,17 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
                 this,
                 serviceMetadata
         );
-
+        // 从配置文件 加载注册中心的URL
         List<URL> registryURLs = ConfigValidationUtils.loadRegistries(this, true);
-
+        // 导出服务使用的协议配置，只有一个会生效
         for (ProtocolConfig protocolConfig : protocols) {
             String pathKey = URL.buildKey(getContextPath(protocolConfig)
                     .map(p -> p + "/" + path)
                     .orElse(path), group, version);
             // In case user specified path, register service one more time to map it to path.
+            // 解析并创建 ServiceDescriptor 保存在 services Map
             repository.registerService(pathKey, interfaceClass);
+            // 解析相关配置参数，并将接口进行导出
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }
@@ -371,7 +388,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
         Map<String, String> map = buildAttributes(protocolConfig);
 
-        //init serviceMetadata attachments
+        //init serviceMetadata attachments；这些参数会被推送至远程
         serviceMetadata.getAttachments().putAll(map);
 
         URL url = buildUrl(protocolConfig, registryURLs, map);
@@ -531,6 +548,11 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         return url;
     }
 
+    /**
+     *
+     * @param url
+     * @param registryURLs
+     */
     private void exportUrl(URL url, List<URL> registryURLs) {
         String scope = url.getParameter(SCOPE_KEY);
         // don't export when none is configured
@@ -538,6 +560,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
 
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!SCOPE_REMOTE.equalsIgnoreCase(scope)) {
+                // 导出到本地
                 exportLocal(url);
             }
 
@@ -555,6 +578,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         if (CollectionUtils.isNotEmpty(registryURLs)) {
             for (URL registryURL : registryURLs) {
                 if (SERVICE_REGISTRY_PROTOCOL.equals(registryURL.getProtocol())) {
+                    // 添加服务名映射
                     url = url.addParameterIfAbsent(SERVICE_NAME_MAPPING_KEY, "true");
                 }
 
@@ -589,7 +613,7 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         } else {
 
             if (MetadataService.class.getName().equals(url.getServiceInterface())) {
-                MetadataUtils.saveMetadataURL(url);
+                MetadataUtils.saveMetadataURL(url); // 元数据信息写入内存
             }
 
             if (logger.isInfoEnabled()) {
@@ -603,13 +627,22 @@ public class ServiceConfig<T> extends ServiceConfigBase<T> {
         return url;
     }
 
+    /**
+     * 这是是导出的核心操作；内部生成了 Invoker; 并调用 Protocol 进行导出到远程
+     * @param url
+     * @param withMetaData
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrl(URL url, boolean withMetaData) {
+        // 获取 invoker
         Invoker<?> invoker = PROXY_FACTORY.getInvoker(ref, (Class) interfaceClass, url);
         if (withMetaData) {
+            // 如果需要带元数据，则对 invoker 进行包装
             invoker = new DelegateProviderMetaDataInvoker(invoker, this);
         }
+        // 调用具体协议 实现导出
         Exporter<?> exporter = PROTOCOL.export(invoker);
+        // 将导出的服务 记录在 本地 List 中
         exporters.add(exporter);
     }
 

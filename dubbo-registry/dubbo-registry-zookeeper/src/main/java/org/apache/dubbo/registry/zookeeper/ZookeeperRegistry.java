@@ -78,7 +78,9 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
             group = PATH_SEPARATOR + group;
         }
         this.root = group;
+        // 连接 zookeeper
         zkClient = zookeeperTransporter.connect(url);
+        // 状态监听
         zkClient.addStateListener((state) -> {
             if (state == StateListener.RECONNECTED) {
                 logger.warn("Trying to fetch the latest urls, in case there're provider changes during connection loss.\n" +
@@ -108,6 +110,9 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         return zkClient.isConnected();
     }
 
+    /**
+     * 关闭 Zookeeper 链接
+     */
     @Override
     public void destroy() {
         super.destroy();
@@ -118,6 +123,10 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         }
     }
 
+    /**
+     * 注册 url
+     * @param url
+     */
     @Override
     public void doRegister(URL url) {
         try {
@@ -127,6 +136,10 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         }
     }
 
+    /**
+     * 取消注册
+     * @param url
+     */
     @Override
     public void doUnregister(URL url) {
         try {
@@ -136,6 +149,11 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         }
     }
 
+    /**
+     * 订阅
+     * @param url
+     * @param listener
+     */
     @Override
     public void doSubscribe(final URL url, final NotifyListener listener) {
         try {
@@ -186,6 +204,11 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         }
     }
 
+    /**
+     * 取消订阅
+     * @param url
+     * @param listener
+     */
     @Override
     public void doUnsubscribe(URL url, NotifyListener listener) {
         ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
@@ -208,6 +231,11 @@ public class ZookeeperRegistry extends CacheableFailbackRegistry {
         }
     }
 
+    /**
+     * 检查
+     * @param url
+     * @return
+     */
     @Override
     public List<URL> lookup(URL url) {
         if (url == null) {
